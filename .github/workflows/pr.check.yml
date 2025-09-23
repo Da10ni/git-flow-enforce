@@ -1,0 +1,59 @@
+name: Git Flow Sync
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, development]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Setup and Sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Get info
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          TARGET="${{ github.event.pull_request.base.ref }}"
+          
+          # Check if hotfix or release
+          if [[ ! "$BRANCH" =~ ^(hotfix|release)/ ]]; then
+            echo "Not a hotfix or release branch"
+            exit 0
+          fi
+          
+          # Determine sync direction
+          if [ "$TARGET" = "main" ]; then
+            SYNC_TO="development"
+          elif [ "$TARGET" = "development" ]; then
+            SYNC_TO="main"
+          else
+            exit 0
+          fi
+          
+          # Try merge
+          git fetch origin
+          git checkout $SYNC_TO
+          
+          if git merge origin/$TARGET -m "Sync from $TARGET after $BRANCH"; then
+            git push origin $SYNC_TO
+          else
+            # Create PR on conflict
+            SYNC_BRANCH="sync-${GITHUB_RUN_NUMBER}"
+            git checkout -b $SYNC_BRANCH origin/$TARGET
+            git push origin $SYNC_BRANCH
+            gh pr create --base $SYNC_TO --head $SYNC_BRANCH --title "Sync $TARGET to $SYNC_TO" --body "Conflicts need resolution"
+          fi

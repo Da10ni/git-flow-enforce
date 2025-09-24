@@ -31,70 +31,132 @@ check_parent_branch() {
     local branch=$1
     local expected_parent=$2
     
-    # Check if branch already exists on remote (skip parent check)
+    # Check if branch already exists on remote (skip parent check for existing branches)
     if git ls-remote --heads origin "$branch" 2>/dev/null | grep -q .; then
-        echo "✅ Branch already exists on remote"
+        echo "✅ Branch already exists on remote (skipping parent check)"
         return 0
     fi
     
     # For new branches, check immediate parent
-    echo "🔍 Checking immediate parent branch for new branch..."
+    echo "🔍 Checking parent branch for new branch..."
+    
+    # Update refs to ensure we have latest info
+    git fetch origin "$expected_parent" 2>/dev/null || true
     
     # Get the expected parent's latest commit
-    local parent_commit=$(git rev-parse "$expected_parent" 2>/dev/null || echo "")
+    local parent_commit=$(git rev-parse "origin/$expected_parent" 2>/dev/null || git rev-parse "$expected_parent" 2>/dev/null || echo "")
     if [ -z "$parent_commit" ]; then
-        echo "❌ Parent branch '$expected_parent' not found locally!"
-        echo "ℹ️  Try: git fetch origin && git checkout $expected_parent"
+        echo "❌ Parent branch '$expected_parent' not found!"
         return 1
     fi
     
-    # Method 1: Check if current branch's first commit is directly from expected parent
-    # Get the first commit of current branch that's not in expected parent
-    local first_unique_commit=$(git rev-list --reverse "$expected_parent..HEAD" | head -n 1)
-    
-    if [ -z "$first_unique_commit" ]; then
-        echo "✅ Branch has no unique commits (same as $expected_parent)"
-        return 0
-    fi
-    
-    # Get the parent of the first unique commit
-    local actual_parent=$(git rev-parse "$first_unique_commit^" 2>/dev/null || echo "")
-    
-    # Check if the actual parent is the tip of expected parent branch
-    if [ "$actual_parent" = "$parent_commit" ]; then
-        echo "✅ Branch was created directly from $expected_parent"
-        return 0
-    fi
-    
-    # Method 2: Alternative check using reflog (if available)
-    # This checks the reflog to see where the branch was created from
-    local branch_creation=$(git reflog show --format="%H %gs" "$current_branch" 2>/dev/null | grep "branch: Created from" | head -n 1)
+    # Method 1: Check using reflog (most reliable for recently created branches)
+    local branch_creation=$(git reflog show --format="%H %gs" "$current_branch" 2>/dev/null | grep -E "(branch: Created from|checkout: moving from)" | tail -n 1)
     
     if echo "$branch_creation" | grep -q "$expected_parent"; then
         echo "✅ Branch was created from $expected_parent (via reflog)"
         return 0
     fi
     
-    # Method 3: Check if all commits from expected parent are in current branch
-    # AND current branch was diverged from expected parent recently
-    local commits_behind=$(git rev-list --count "$current_branch..$expected_parent" 2>/dev/null || echo "999")
-    
-    if [ "$commits_behind" -eq 0 ]; then
-        # Current branch contains all commits from expected parent
-        # Now check if divergence point is recent (expected parent's tip)
-        local divergence_point=$(git merge-base "$current_branch" "$expected_parent")
+    # Method 2: For hotfix branches, check if they branched from main's lineage
+    if [ "$expected_parent" = "main" ]; then
+        # Get all commits in current branch
+        local current_commits=$(git rev-list HEAD)
         
-        if [ "$divergence_point" = "$parent_commit" ]; then
-            echo "✅ Branch diverged from tip of $expected_parent"
+        # Get all commits in main
+        local main_commits=$(git rev-list origin/main 2>/dev/null || git rev-list main 2>/dev/null)
+        
+        # Check if first unique commit's parent is in main's history
+        local first_unique_commit=""
+        for commit in $(git rev-list --reverse HEAD); do
+            if ! echo "$main_commits" | grep -q "^$commit$"; then
+                first_unique_commit=$commit
+                break
+            fi
+        done
+        
+        if [ -n "$first_unique_commit" ]; then
+            local first_parent=$(git rev-parse "$first_unique_commit^" 2>/dev/null || echo "")
+            if echo "$main_commits" | grep -q "^$first_parent$"; then
+                echo "✅ Branch was created from main's lineage"
+                return 0
+            fi
+        else
+            # No unique commits yet
+            echo "✅ Branch has no unique commits yet"
             return 0
         fi
     fi
     
-    # If all methods fail, branch was not created from expected parent
-    echo "❌ Branch was NOT created directly from $expected_parent"
-    echo "ℹ️  Actual parent commit: $actual_parent"
-    echo "ℹ️  Expected parent commit: $parent_commit"
-    echo "ℹ️  Commits behind $expected_parent: $commits_behind"
+    # Method 3: For feature/release branches, ensure they came from development
+    if [ "$expected_parent" = "development" ]; then
+        # Check if the branch contains any commits that are in main but NOT in development
+        # This would indicate it was created from main
+        git fetch origin main 2>/dev/null || true
+        
+        # Get commits that are in main but not in development
+        local main_only_commits=$(git rev-list origin/main --not origin/development 2>/dev/null || echo "")
+        
+        if [ -n "$main_only_commits" ]; then
+            # Check if current branch contains any of these main-only commits
+            for commit in $main_only_commits; do
+                if git rev-list HEAD | grep -q "^$commit$"; then
+                    echo "❌ Branch contains commits from main that are not in development!"
+                    echo "❌ This indicates the branch was created from main instead of development"
+                    echo "❌ Problematic commit: $commit"
+                    return 1
+                fi
+            done
+        fi
+        
+        # Additional check: Verify the branch diverged from development's history
+        local dev_commits=$(git rev-list origin/development 2>/dev/null || git rev-list development 2>/dev/null)
+        local first_unique_commit=""
+        
+        for commit in $(git rev-list --reverse HEAD); do
+            if ! echo "$dev_commits" | grep -q "^$commit$"; then
+                first_unique_commit=$commit
+                break
+            fi
+        done
+        
+        if [ -n "$first_unique_commit" ]; then
+            local first_parent=$(git rev-parse "$first_unique_commit^" 2>/dev/null || echo "")
+            if echo "$dev_commits" | grep -q "^$first_parent$"; then
+                echo "✅ Branch was created from development's lineage"
+                return 0
+            fi
+        else
+            # No unique commits yet
+            echo "✅ Branch has no unique commits yet"
+            return 0
+        fi
+    fi
+    
+    # If we reach here, branch wasn't created from expected parent
+    echo "❌ Branch was NOT created from $expected_parent"
+    return 1
+}
+
+# Special handling for branches that might be in merge process
+is_branch_in_merge_process() {
+    local branch=$1
+    
+    # Check if this branch has already been merged to main or development
+    # This helps with the GitFlow process where hotfixes/releases get merged to multiple branches
+    
+    # Check if the branch has been merged to origin/main
+    if git branch -r --merged origin/main 2>/dev/null | grep -q "origin/$branch"; then
+        echo "ℹ️  Branch has been merged to main (likely in GitFlow merge process)"
+        return 0
+    fi
+    
+    # Check if the branch has been merged to origin/development
+    if git branch -r --merged origin/development 2>/dev/null | grep -q "origin/$branch"; then
+        echo "ℹ️  Branch has been merged to development (likely in GitFlow merge process)"
+        return 0
+    fi
+    
     return 1
 }
 
@@ -103,7 +165,10 @@ case "$current_branch" in
     hotfix/*)
         echo "🏥 Validating hotfix branch: $current_branch"
         
-        if ! check_parent_branch "$current_branch" "main"; then
+        # Check if this hotfix is in merge process (already merged somewhere)
+        if is_branch_in_merge_process "$current_branch"; then
+            echo "✅ Hotfix branch is in merge process, skipping parent validation"
+        elif ! check_parent_branch "$current_branch" "main"; then
             echo "" >&2
             echo "❌ =================================" >&2
             echo "❌ HOTFIX MUST BE FROM MAIN!" >&2
@@ -151,7 +216,10 @@ case "$current_branch" in
     release/*)
         echo "🚀 Validating release branch: $current_branch"
         
-        if ! check_parent_branch "$current_branch" "development"; then
+        # Check if this release is in merge process (already merged somewhere)
+        if is_branch_in_merge_process "$current_branch"; then
+            echo "✅ Release branch is in merge process, skipping parent validation"
+        elif ! check_parent_branch "$current_branch" "development"; then
             echo "" >&2
             echo "❌ =================================" >&2
             echo "❌ RELEASE MUST BE FROM DEVELOPMENT!" >&2
@@ -202,4 +270,4 @@ case "$current_branch" in
 esac
 
 echo "✅ All checks passed! Push allowed!"
-exit 0  
+exit 0

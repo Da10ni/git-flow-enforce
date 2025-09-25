@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-push hook - Fixed version
+# pre-push hook - Enhanced with merge restrictions
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
@@ -11,6 +11,23 @@ case "$current_branch" in
         exit 1
         ;;
 esac
+
+# Check if current commit is a merge commit
+if git rev-parse --verify -q MERGE_HEAD >/dev/null 2>&1 || \
+   git show --pretty=format:"%P" -s HEAD | grep -q " "; then
+    
+    echo "🔍 Merge commit detected"
+    
+    # Block merges in feature/* and release/* branches
+    case "$current_branch" in
+        feature/*|release/*)
+            echo "❌ Merge commits not allowed in $current_branch!"
+            echo "✅ Use rebase instead: git rebase <parent-branch>"
+            echo "✅ Or squash commits: git rebase -i HEAD~n"
+            exit 1
+            ;;
+    esac
+fi
 
 # Get the branch this was created from - FIXED METHOD
 parent=$(git reflog show --format="%gs" HEAD | grep "checkout: moving from" | head -1 | awk '{print $4}')

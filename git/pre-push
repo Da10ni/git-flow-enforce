@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-push hook - Fixed version
+# pre-push hook - Enhanced version with merge prevention
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
@@ -9,6 +9,51 @@ case "$current_branch" in
         echo "❌ Direct push to $current_branch blocked!"
         echo "✅ Use Pull Request workflow"
         exit 1
+        ;;
+esac
+
+# NEW: Check for merge commits in feature/* and release/* branches
+case "$current_branch" in
+    feature/*|release/*)
+        echo "🔍 Checking for merge commits in $current_branch..."
+        
+        # Check if remote branch exists
+        if git ls-remote --exit-code --heads origin "$current_branch" >/dev/null 2>&1; then
+            # Remote branch exists - check commits we're about to push
+            range="origin/$current_branch..HEAD"
+        else
+            # New branch - check all commits on this branch
+            range="HEAD"
+        fi
+        
+        # Look for merge commits (commits with multiple parents)
+        merge_commits=$(git rev-list --merges $range 2>/dev/null)
+        
+        if [ -n "$merge_commits" ]; then
+            echo "" >&2
+            echo "❌ =========================================" >&2
+            echo "❌ PUSH BLOCKED - MERGE COMMITS DETECTED!" >&2
+            echo "❌ Branch: $current_branch" >&2
+            echo "❌ =========================================" >&2
+            echo "" >&2
+            echo "🔍 Found merge commits:" >&2
+            for commit in $merge_commits; do
+                echo "   • $(git log --oneline -1 $commit)" >&2
+            done
+            echo "" >&2
+            echo "✅ Correct workflow:" >&2
+            echo "   1. Reset to remove merge commits:" >&2
+            echo "      git reset --hard origin/$current_branch" >&2
+            echo "   2. Use rebase instead of merge:" >&2
+            echo "      git rebase development" >&2
+            echo "   3. Or create Pull Request for merging" >&2
+            echo "" >&2
+            echo "ℹ️  $current_branch should only have linear commits!" >&2
+            echo "" >&2
+            exit 1
+        fi
+        
+        echo "✅ No merge commits detected - push allowed"
         ;;
 esac
 

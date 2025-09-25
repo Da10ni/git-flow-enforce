@@ -1,0 +1,62 @@
+#!/bin/sh
+# .git/hooks/pre-merge-commit
+# Prevents merging into feature/* and release/* branches
+# Make executable: chmod +x .git/hooks/pre-merge-commit
+
+# Get current branch
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+echo "🔍 Merge attempt detected on branch: $current_branch"
+
+# Block merges into feature/* and release/* branches
+case "$current_branch" in
+    feature/*)
+        echo "" >&2
+        echo "❌ =================================" >&2
+        echo "❌ MERGE BLOCKED!" >&2
+        echo "❌ Cannot merge into feature branch" >&2
+        echo "❌ Branch: $current_branch" >&2
+        echo "❌ =================================" >&2
+        echo "" >&2
+        echo "✅ Correct workflow:" >&2
+        echo "   1. Finish your feature work" >&2
+        echo "   2. Push feature branch: git push origin $current_branch" >&2
+        echo "   3. Create Pull Request to development" >&2
+        echo "   4. Merge via Pull Request only" >&2
+        echo "" >&2
+        echo "ℹ️  Feature branches should stay linear!" >&2
+        echo "" >&2
+        exit 1
+        ;;
+    release/*)
+        echo "" >&2
+        echo "❌ =================================" >&2
+        echo "❌ MERGE BLOCKED!" >&2
+        echo "❌ Cannot merge into release branch" >&2
+        echo "❌ Branch: $current_branch" >&2
+        echo "❌ =================================" >&2
+        echo "" >&2
+        echo "✅ Correct workflow:" >&2
+        echo "   1. Fix issues with direct commits" >&2
+        echo "   2. Push release branch: git push origin $current_branch" >&2
+        echo "   3. Create Pull Request to main and development" >&2
+        echo "   4. Merge via Pull Request only" >&2
+        echo "" >&2
+        echo "ℹ️  Release branches should only have direct commits!" >&2
+        echo "" >&2
+        exit 1
+        ;;
+    main|development)
+        echo "✅ Merge allowed into $current_branch"
+        ;;
+    hotfix/*)
+        echo "✅ Merge allowed into hotfix branch"
+        ;;
+    *)
+        echo "⚠️  Unknown branch pattern: $current_branch"
+        echo "✅ Allowing merge..."
+        ;;
+esac
+
+echo "✅ Merge validation passed!"
+exit 0

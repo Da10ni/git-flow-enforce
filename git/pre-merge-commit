@@ -1,141 +1,141 @@
-# #!/bin/sh
-# # .git/hooks/pre-merge-commit
-# # Prevents merging into feature/* and release/* branches
-# # Make executable: chmod +x .git/hooks/pre-merge-commit
-
-# # Get current branch
-# current_branch=$(git rev-parse --abbrev-ref HEAD)
-
-# echo "🔍 Merge attempt detected on branch: $current_branch"
-
-# # Block merges into feature/* and release/* branches
-# case "$current_branch" in
-#     feature/*)
-#         echo "" >&2
-#         echo "❌ =================================" >&2
-#         echo "❌ MERGE BLOCKED!" >&2
-#         echo "❌ Cannot merge into feature branch" >&2
-#         echo "❌ Branch: $current_branch" >&2
-#         echo "❌ =================================" >&2
-#         echo "" >&2
-#         echo "✅ Correct workflow:" >&2
-#         echo "   1. Finish your feature work" >&2
-#         echo "   2. Push feature branch: git push origin $current_branch" >&2
-#         echo "   3. Create Pull Request to development" >&2
-#         echo "   4. Merge via Pull Request only" >&2
-#         echo "" >&2
-#         echo "ℹ️  Feature branches should stay linear!" >&2
-#         echo "" >&2
-#         exit 1
-#         ;;
-#     release/*)
-#         echo "" >&2
-#         echo "❌ =================================" >&2
-#         echo "❌ MERGE BLOCKED!" >&2
-#         echo "❌ Cannot merge into release branch" >&2
-#         echo "❌ Branch: $current_branch" >&2
-#         echo "❌ =================================" >&2
-#         echo "" >&2
-#         echo "✅ Correct workflow:" >&2
-#         echo "   1. Fix issues with direct commits" >&2
-#         echo "   2. Push release branch: git push origin $current_branch" >&2
-#         echo "   3. Create Pull Request to main and development" >&2
-#         echo "   4. Merge via Pull Request only" >&2
-#         echo "" >&2
-#         echo "ℹ️  Release branches should only have direct commits!" >&2
-#         echo "" >&2
-#         exit 1
-#         ;;
-#     main|development)
-#         echo "✅ Merge allowed into $current_branch"
-#         ;;
-#     hotfix/*)
-#         echo "✅ Merge allowed into hotfix branch"
-#         ;;
-#     *)
-#         echo "⚠️  Unknown branch pattern: $current_branch"
-#         echo "✅ Allowing merge..."
-#         ;;
-# esac
-
-# echo "✅ Merge validation passed!"
-# exit 0
-
-
-
 #!/bin/sh
-# .git/hooks/prepare-commit-msg
-# Prevents unauthorized merges according to Git Flow rules
-# Make executable: chmod +x .git/hooks/prepare-commit-msg
+# .git/hooks/pre-merge-commit
+# Prevents merging into feature/* and release/* branches
+# Make executable: chmod +x .git/hooks/pre-merge-commit
 
-COMMIT_MSG_FILE=$1
-COMMIT_SOURCE=$2
-SHA1=$3
+# Get current branch
+current_branch=$(git rev-parse --abbrev-ref HEAD)
 
-# Only check for merge commits
-if [ "$COMMIT_SOURCE" = "merge" ] || grep -q "^Merge " "$COMMIT_MSG_FILE"; then
-    
-    # Get current branch
-    current_branch=$(git rev-parse --abbrev-ref HEAD)
-    
-    echo "Merge commit detected on branch: $current_branch"
-    
-    # Block merges into branches that should not receive merges
-    case "$current_branch" in
-        feature/*)
-            echo "" >&2
-            echo "===============================" >&2
-            echo "MERGE BLOCKED!" >&2
-            echo "Cannot merge into feature branch" >&2
-            echo "Branch: $current_branch" >&2
-            echo "===============================" >&2
-            echo "" >&2
-            echo "Correct workflow:" >&2
-            echo "1. git merge --abort" >&2
-            echo "2. Push feature: git push origin $current_branch" >&2
-            echo "3. Create Pull Request to development" >&2
-            echo "" >&2
-            exit 1
-            ;;
-        release/*)
-            echo "" >&2
-            echo "===============================" >&2
-            echo "MERGE BLOCKED!" >&2
-            echo "Cannot merge into release branch" >&2
-            echo "Branch: $current_branch" >&2
-            echo "===============================" >&2
-            echo "" >&2
-            echo "Correct workflow:" >&2
-            echo "1. git merge --abort" >&2
-            echo "2. Make direct commits only" >&2
-            echo "3. Push release: git push origin $current_branch" >&2
-            echo "" >&2
-            exit 1
-            ;;
-        hotfix/*)
-            echo "" >&2
-            echo "===============================" >&2
-            echo "MERGE BLOCKED!" >&2
-            echo "Cannot merge into hotfix branch" >&2
-            echo "Branch: $current_branch" >&2
-            echo "===============================" >&2
-            echo "" >&2
-            echo "Correct workflow:" >&2
-            echo "1. git merge --abort" >&2
-            echo "2. Make direct commits only" >&2
-            echo "3. Push hotfix: git push origin $current_branch" >&2
-            echo "4. Hotfix will auto-merge to main and development" >&2
-            echo "" >&2
-            exit 1
-            ;;
-        main|development)
-              echo "Merge allowed into $current_branch"
-              ;;
-        *)
-            echo "Unknown branch pattern: $current_branch"
-            echo "Allowing merge..."
-            ;;
-    esac
-fi
+echo "🔍 Merge attempt detected on branch: $current_branch"
 
+# Block merges into feature/* and release/* branches
+case "$current_branch" in
+    feature/*)
+        echo "" >&2
+        echo "❌ =================================" >&2
+        echo "❌ MERGE BLOCKED!" >&2
+        echo "❌ Cannot merge into feature branch" >&2
+        echo "❌ Branch: $current_branch" >&2
+        echo "❌ =================================" >&2
+        echo "" >&2
+        echo "✅ Correct workflow:" >&2
+        echo "   1. Finish your feature work" >&2
+        echo "   2. Push feature branch: git push origin $current_branch" >&2
+        echo "   3. Create Pull Request to development" >&2
+        echo "   4. Merge via Pull Request only" >&2
+        echo "" >&2
+        echo "ℹ️  Feature branches should stay linear!" >&2
+        echo "" >&2
+        exit 1
+        ;;
+    release/*)
+        echo "" >&2
+        echo "❌ =================================" >&2
+        echo "❌ MERGE BLOCKED!" >&2
+        echo "❌ Cannot merge into release branch" >&2
+        echo "❌ Branch: $current_branch" >&2
+        echo "❌ =================================" >&2
+        echo "" >&2
+        echo "✅ Correct workflow:" >&2
+        echo "   1. Fix issues with direct commits" >&2
+        echo "   2. Push release branch: git push origin $current_branch" >&2
+        echo "   3. Create Pull Request to main and development" >&2
+        echo "   4. Merge via Pull Request only" >&2
+        echo "" >&2
+        echo "ℹ️  Release branches should only have direct commits!" >&2
+        echo "" >&2
+        exit 1
+        ;;
+    main|development)
+        echo "✅ Merge allowed into $current_branch"
+        ;;
+    hotfix/*)
+        echo "✅ Merge allowed into hotfix branch"
+        ;;
+    *)
+        echo "⚠️  Unknown branch pattern: $current_branch"
+        echo "✅ Allowing merge..."
+        ;;
+esac
+
+echo "✅ Merge validation passed!"
 exit 0
+
+
+
+# #!/bin/sh
+# # .git/hooks/prepare-commit-msg
+# # Prevents unauthorized merges according to Git Flow rules
+# # Make executable: chmod +x .git/hooks/prepare-commit-msg
+
+# COMMIT_MSG_FILE=$1
+# COMMIT_SOURCE=$2
+# SHA1=$3
+
+# # Only check for merge commits
+# if [ "$COMMIT_SOURCE" = "merge" ] || grep -q "^Merge " "$COMMIT_MSG_FILE"; then
+    
+#     # Get current branch
+#     current_branch=$(git rev-parse --abbrev-ref HEAD)
+    
+#     echo "Merge commit detected on branch: $current_branch"
+    
+#     # Block merges into branches that should not receive merges
+#     case "$current_branch" in
+#         feature/*)
+#             echo "" >&2
+#             echo "===============================" >&2
+#             echo "MERGE BLOCKED!" >&2
+#             echo "Cannot merge into feature branch" >&2
+#             echo "Branch: $current_branch" >&2
+#             echo "===============================" >&2
+#             echo "" >&2
+#             echo "Correct workflow:" >&2
+#             echo "1. git merge --abort" >&2
+#             echo "2. Push feature: git push origin $current_branch" >&2
+#             echo "3. Create Pull Request to development" >&2
+#             echo "" >&2
+#             exit 1
+#             ;;
+#         release/*)
+#             echo "" >&2
+#             echo "===============================" >&2
+#             echo "MERGE BLOCKED!" >&2
+#             echo "Cannot merge into release branch" >&2
+#             echo "Branch: $current_branch" >&2
+#             echo "===============================" >&2
+#             echo "" >&2
+#             echo "Correct workflow:" >&2
+#             echo "1. git merge --abort" >&2
+#             echo "2. Make direct commits only" >&2
+#             echo "3. Push release: git push origin $current_branch" >&2
+#             echo "" >&2
+#             exit 1
+#             ;;
+#         hotfix/*)
+#             echo "" >&2
+#             echo "===============================" >&2
+#             echo "MERGE BLOCKED!" >&2
+#             echo "Cannot merge into hotfix branch" >&2
+#             echo "Branch: $current_branch" >&2
+#             echo "===============================" >&2
+#             echo "" >&2
+#             echo "Correct workflow:" >&2
+#             echo "1. git merge --abort" >&2
+#             echo "2. Make direct commits only" >&2
+#             echo "3. Push hotfix: git push origin $current_branch" >&2
+#             echo "4. Hotfix will auto-merge to main and development" >&2
+#             echo "" >&2
+#             exit 1
+#             ;;
+#         main|development)
+#               echo "Merge allowed into $current_branch"
+#               ;;
+#         *)
+#             echo "Unknown branch pattern: $current_branch"
+#             echo "Allowing merge..."
+#             ;;
+#     esac
+# fi
+
+# exit 0

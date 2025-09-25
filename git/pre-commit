@@ -1,0 +1,23 @@
+#!/bin/sh
+# pre-commit hook - Prevents merging into feature/* and release/* branches
+
+current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# Check if we're in a merge
+if [ -f .git/MERGE_HEAD ]; then
+    echo "🔍 Merge attempt detected on branch: $current_branch"
+    
+    # Block merges into feature/* and release/* branches
+    case "$current_branch" in
+        feature/*|release/*)
+            echo "❌ Merge blocked!"
+            echo "❌ Cannot merge any branch into: $current_branch"
+            echo "✅ feature/* and release/* branches should only receive direct commits"
+            echo "✅ Merge your changes to development branch instead"
+            exit 1
+            ;;
+    esac
+fi
+
+echo "✅ Merge allowed on $current_branch"
+exit 0
